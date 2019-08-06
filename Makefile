@@ -1,15 +1,14 @@
 .PHONY: setup
 setup: ## Install all the build and lint dependencies
-	go get -u github.com/alecthomas/gometalinter
+	go get -u github.com/golangci/golangci-lint/cmd/golangci-lint
 	go get -u golang.org/x/tools/cmd/cover
-	go get -u github.com/golang/dep/cmd/dep
 	gometalinter --install --update
 	@$(MAKE) vgo
 
 .PHONY: vgo
 vgo: ## Run vgo
-	dep ensure
-	dep prune
+	go mod tidy
+	go mod verify
 
 .PHONY: test
 test: ## Run all the tests
@@ -25,13 +24,10 @@ fmt: ## Run goimports on all go files
 
 .PHONY: lint
 lint: ## Run all the linters
-	gometalinter --vendor --disable-all \
-		--enable=deadcode \
-		--enable=ineffassign \
-		--enable=gosimple \
+    golangci-lint run --disable-all \
 		--enable=staticcheck \
 		--enable=gofmt \
-		--enable=goimports \
+		--enable=golint \
 		--enable=misspell \
 		--enable=errcheck \
 		--enable=vet \
