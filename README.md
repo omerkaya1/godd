@@ -1,4 +1,6 @@
-# godd - A simplified implementation of the [`dd`](https://en.wikipedia.org/wiki/Dd_(Unix\)) utility written in Go
+# godd 
+
+A simplified implementation of the [`dd`](https://en.wikipedia.org/wiki/Dd_(Unix) utility written in Go
 
 ## Supported command line arguments
 

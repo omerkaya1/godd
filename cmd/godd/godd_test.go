@@ -1,4 +1,4 @@
-package dd
+package godd
 
 import (
 	"github.com/stretchr/testify/assert"
@@ -6,5 +6,5 @@ import (
 )
 
 func TestDoCool(t *testing.T) {
-	assert.NoError(t, DoCool())
+	assert.NoError(t, DoCool(1, 2, "", ""))
 }
