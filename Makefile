@@ -1,6 +1,8 @@
 .PHONY: setup
 setup: ## Install all the build and lint dependencies
 	go get -u github.com/golangci/golangci-lint/cmd/golangci-lint
+    go get -u mvdan.cc/unindent
+    go get github.com/fzipp/gocyclo
 	go get -u golang.org/x/tools/cmd/cover
 	gometalinter --install --update
 	@$(MAKE) vgo
@@ -24,14 +26,17 @@ fmt: ## Run goimports on all go files
 
 .PHONY: lint
 lint: ## Run all the linters
-    golangci-lint run --disable-all \
-		--enable=staticcheck \
+	golangci-lint run --disable-all \
+     	--enable=staticcheck \
+		--enable=gosimple \
 		--enable=gofmt \
 		--enable=golint \
 		--enable=misspell \
 		--enable=errcheck \
 		--enable=vet \
 		--enable=vetshadow \
+		--enable=unindent \
+		--enable=gocyclo \
 		--deadline=10m \
 		./...
 
