@@ -11,29 +11,29 @@ type Duplicator struct {
 	inFile  *os.File
 	outFile *os.File
 	bs      int64
-	count   int
+	count   int64
 	offset  int64
 }
 
-// NewDuplicator returns an
-func NewDuplicator(bs, offset *int64, count *int, input, output *string) (*Duplicator, error) {
+// NewDuplicator returns a new Duplicator object
+func NewDuplicator(bs, offset, count int64, input, output string) (*Duplicator, error) {
 	// Main variables
 	var inFile, outFile *os.File
 	var err error
 
-	if *input == "" {
+	if input == "" {
 		inFile = os.Stdin
 	} else {
-		inFile, err = os.OpenFile(*input, os.O_RDONLY, 0644)
+		inFile, err = os.Open(input)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	if *output == "" {
+	if output == "" {
 		outFile = os.Stdout
 	} else {
-		outFile, err = os.OpenFile(*output, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
+		outFile, err = os.OpenFile(output, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 		if err != nil {
 			return nil, err
 		}
@@ -42,35 +42,16 @@ func NewDuplicator(bs, offset *int64, count *int, input, output *string) (*Dupli
 	return &Duplicator{
 		inFile:  inFile,
 		outFile: outFile,
-		bs:      setBlockSize(*bs),
-		count:   *count,
-		offset:  *offset,
+		bs:      bs,
+		count:   count,
+		offset:  offset,
 	}, nil
 }
 
-func setBlockSize(bs int64) int64 {
-	if bs == 0 {
-		return 1024
-	} else {
-		return bs
-	}
-}
-
-//func (d *Duplicator) ReadCount(in, out *os.File, read chan<- int) error {
-//	return nil
-//}
-//
-//func (d *Duplicator) readFile(in, out *os.File, read chan<- int, bs, count int) error {
-//	return nil
-//}
-
-func (d *Duplicator) DoCool() error {
+func (d *Duplicator) CopyContents() error {
 	defer d.inFile.Close()
 	defer d.outFile.Close()
-	var total int64
-	buf := make([]byte, d.bs)
-
-	// Get the file statistics
+	// Get the input file statistics
 	stat, err := d.inFile.Stat()
 	if err != nil {
 		return err
@@ -83,36 +64,60 @@ func (d *Duplicator) DoCool() error {
 		}
 	}
 
+	// Check whether the input is a regular file or STDIN
 	if !stat.Mode().IsRegular() {
-		return fmt.Errorf("%s is not a regular file", stat.Name())
+		if _, err := io.WriteString(os.Stdout, "Input text to copy below. (to exit press Ctrl+D)\n"); err != nil {
+			return err
+		}
+	} else {
+		if _, err := io.WriteString(os.Stdout, "Copying started...\n"); err != nil {
+			return err
+		}
 	}
 
-	if _, err := io.WriteString(os.Stdout, "Copying started!\n"); err != nil {
+	// Progress report part
+	if _, err := io.WriteString(os.Stdout, fmt.Sprintf("Bytes to copy %d\n", stat.Size())); err != nil {
 		return err
 	}
 
-	for {
+	total, err := d.writeToOutput()
+	if err != nil {
+		return fmt.Errorf("%v\nWritten: %d bytes", err, total)
+	}
+
+	if _, err := fmt.Fprintf(os.Stdout, "[%d / %d] copied in total\n", total, stat.Size()); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (d *Duplicator) writeToOutput() (int64, error) {
+	var total, counter int64
+	buf := make([]byte, d.bs)
+
+	// Set the limit to write from the source
+	if d.count > 0 {
+		counter = d.count
+	}
+
+	for counter > 0 {
 		n, err := d.inFile.Read(buf)
 		if err != nil && err != io.EOF {
-			return err
+			return total, err
 		}
-		if n == 0 {
+		if n == 0 || err == io.EOF {
 			break
 		}
 		_, err = d.outFile.Write(buf[:n])
 		if err != nil {
-			return err
+			return total, err
+		}
+		// We check for count aka limit, so that writing could be stopped
+		if int64(n) == d.bs && d.count > 0 {
+			counter--
 		}
 		total += int64(n)
 	}
 
-	if _, err := fmt.Fprintf(os.Stdout, "[%d / %d] copied...\n", total, stat.Size()); err != nil {
-		return err
-	}
-
-	if _, err := io.WriteString(os.Stdout, "Done!\n"); err != nil {
-		return err
-	}
-
-	return nil
+	return total, nil
 }
