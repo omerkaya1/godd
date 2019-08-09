@@ -6,65 +6,49 @@ import (
 	"os"
 )
 
-// Duplicator is a type that
+// Duplicator is a type that holds all the data.
 type Duplicator struct {
-	inFile  *os.File
-	outFile *os.File
+	inFile  string
+	outFile string
 	bs      int64
 	count   int64
 	offset  int64
 }
 
-// NewDuplicator returns a new Duplicator object
+// NewDuplicator returns a new Duplicator object.
 func NewDuplicator(bs, offset, count int64, input, output string) (*Duplicator, error) {
-	// Main variables
-	var inFile, outFile *os.File
-	var err error
-
-	if input == "" {
-		inFile = os.Stdin
-	} else {
-		inFile, err = os.Open(input)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if output == "" {
-		outFile = os.Stdout
-	} else {
-		outFile, err = os.OpenFile(output, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	return &Duplicator{
-		inFile:  inFile,
-		outFile: outFile,
+		inFile:  input,
+		outFile: output,
 		bs:      bs,
 		count:   count,
 		offset:  offset,
 	}, nil
 }
 
+// CopyContents method, surprisingly, copies contents of the input file to the output file.
 func (d *Duplicator) CopyContents() error {
-	defer d.inFile.Close()
-	defer d.outFile.Close()
+	// Get files
+	inFile, outFile, err := d.initFiles()
+	if err != nil {
+		return err
+	}
+	defer inFile.Close()
+	defer outFile.Close()
 	// Get the input file statistics
-	stat, err := d.inFile.Stat()
+	stat, err := inFile.Stat()
 	if err != nil {
 		return err
 	}
 
-	// Set the offset (if 0, then it'll start from the beginning of the file)
+	// Set the offset (if 0, then it'll start from the beginning of the file).
 	if d.offset > 0 {
-		if _, err := d.inFile.Seek(d.offset, 0); err != nil {
+		if _, err := inFile.Seek(d.offset, 0); err != nil {
 			return err
 		}
 	}
 
-	// Check whether the input is a regular file or STDIN
+	// Check whether the input is a regular file or STDIN.
 	if !stat.Mode().IsRegular() {
 		if _, err := io.WriteString(os.Stdout, "Input text to copy below. (to exit press Ctrl+D)\n"); err != nil {
 			return err
@@ -75,12 +59,12 @@ func (d *Duplicator) CopyContents() error {
 		}
 	}
 
-	// Progress report part
+	// Progress report part.
 	if _, err := io.WriteString(os.Stdout, fmt.Sprintf("Bytes to copy %d\n", stat.Size())); err != nil {
 		return err
 	}
 
-	total, err := d.writeToOutput()
+	total, err := d.writeToOutput(inFile, outFile)
 	if err != nil {
 		return fmt.Errorf("%v\nWritten: %d bytes", err, total)
 	}
@@ -91,24 +75,48 @@ func (d *Duplicator) CopyContents() error {
 	return nil
 }
 
-func (d *Duplicator) writeToOutput() (int64, error) {
+func (d *Duplicator) initFiles() (*os.File, *os.File, error) {
+	// Main variables
+	var inFile, outFile *os.File
+	var err error
+
+	if d.inFile == "" {
+		inFile = os.Stdin
+	} else {
+		inFile, err = os.Open(d.inFile)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	if d.outFile == "" {
+		outFile = os.Stdout
+	} else {
+		outFile, err = os.OpenFile(d.outFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+	return inFile, outFile, nil
+}
+
+func (d *Duplicator) writeToOutput(inFile, outFile *os.File) (int64, error) {
 	var total, counter int64
 	buf := make([]byte, d.bs)
 
 	// Set the limit to write from the source
 	if d.count > 0 {
-		counter = d.count
+		counter = d.count - 1
 	}
-
-	for counter > 0 {
-		n, err := d.inFile.Read(buf)
+	for counter >= 0 {
+		n, err := inFile.Read(buf)
 		if err != nil && err != io.EOF {
 			return total, err
 		}
 		if n == 0 || err == io.EOF {
 			break
 		}
-		_, err = d.outFile.Write(buf[:n])
+		_, err = outFile.Write(buf[:n])
 		if err != nil {
 			return total, err
 		}

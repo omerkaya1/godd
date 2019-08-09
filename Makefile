@@ -1,28 +1,24 @@
-# Tabs are the main pain when it commes to Makefile debugging, so after you're done with the changes
+# Tabs are the main pain when it comes to Makefile debugging, so after you're done with the changes
 # in the Makefile, run 'cat -e -t -v Makefile' to see where tabs were substituted with spaces
 # ^I indicates \t and $ indicates \r or \n. Both are vital and everything else before and after may
 # cause make errors.
-
+BUILD = $(CURDIR)/bin
+$(shell mkdir -p $(BUILD))
 export GO111MODULE=on
-BIN = $(CURDIR)/build
-# export PATH=$PATH:$GOPATH/bin
+export GOPATH=$(go env GOPATH)
 
 .PHONY: setup
 setup: ## Install all the build and lint dependencies
-	cd $(BIN)
-	go get -u github.com/golangci/golangci-lint/cmd/golangci-lint
-	go get -u golang.org/x/tools/cmd/cover
-	go get -u golang.org/x/tools/cmd/goimports
-	cd ../
+	go get -u golang.org/x/tools
+	go get -u golang.org/x/lint/golint
 
 .PHONY: mod
 mod: ## Runs mod
-	go mod vendor
 	go mod verify
 	go mod tidy
 
 .PHONY: test
-test: ## Runs all the tests
+test: setup ## Runs all the tests
 	echo 'mode: atomic' > coverage.txt && go test -covermode=atomic -coverprofile=coverage.txt -v -race -timeout=30s ./...
 
 .PHONY: cover
@@ -35,27 +31,18 @@ fmt: setup ## Run goimports on all go files
 
 .PHONY: lint
 lint: setup ## Runs all the linters
-	$(BIN)/golangci-lint run --disable-all \
-		--enable=staticcheck \
-		--enable=gosimple \
-		--enable=gofmt \
-		--enable=golint \
-		--enable=misspell \
-		--enable=errcheck \
-		--enable=vet \
-		--enable=vetshadow \
-		--deadline=10m \
-		./...
+	golint ./...
 
 .PHONY: build
 build: ## Builds the project
-	go build -o $(GOPATH)build/godd
+	go build -o $(BUILD)/godd
 
 .PHONY: clean
 clean: ## Remove temporary files
 	go clean
-	rm -rf $(BIN)
-	rm testdata/output_file.txt
+	rm -rf testdata/output_file.txt
+	rm -rf $(BUILD)
+	rm -rf coverage.txt
 
 .PHONY: help
 help:

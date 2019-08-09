@@ -2,8 +2,9 @@ package main
 
 import (
 	"flag"
-	"github.com/omerkaya1/godd/cmd/godd"
 	"log"
+
+	"github.com/omerkaya1/godd/cmd/godd"
 )
 
 func main() {
